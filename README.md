@@ -19,7 +19,12 @@ Verilog in simulation (Stage 2b). All 5,828 output pixels match.*
 All numbers are XST synthesis estimates (ISE 14.7, xc6vlx240t-1-ff1156, `IMG_W = 640`), before
 place-and-route. Every stage passes its testbench.
 
-### Stage 2a: pipelined MAC
+### Stage 1 baseline and Stage 2a: pipelined MAC
+
+Stage 1 is a signed int8 multiply-accumulate unit (`rtl/1_mac/mac.v`): a 16-bit signed product and
+a 32-bit accumulator with synchronous reset, enable, and a `clr` that starts a new dot product on
+the same clock. XST maps the whole thing into a single DSP48E1 ("8x8-to-32-bit Loadable MAC").
+Stage 2a registers the product so the multiply and the add happen on different clocks.
 
 | | Stage 1 `mac` | Stage 2a `mac_p` |
 |---|---|---|
@@ -70,13 +75,14 @@ Report excerpts with the critical paths are in [`results/synthesis/`](results/sy
 
 ```
 rtl/
+  1_mac/                    mac.v                       Stage 1 baseline: int8 multiply-accumulate
   2a_pipelined_mac/         mac_p.v                     pipelined multiply-accumulate
   2b_sobel/                 sobel.v, conv3x3.v          first Sobel: line buffer, 3x3 window, 2 x conv3x3
   2c_pipelined_adder/       sobel.v, conv3x3.v          adder tree split over two clocks
   2d_pipelined_magnitude/   sobel.v, conv3x3.v          magnitude split over two clocks
   2e_constant_kernel/       sobel.v, sobel_kernel.v     fixed Sobel, no multipliers
 sim/
-  tb_mac_p.v, vectors.txt                               testbench + test vectors for 2a
+  tb_mac.v, tb_mac_p.v, vectors.txt                     testbenches + shared test vectors for 1 and 2a
   tb_sobel.v, image.hex, expected.txt                   testbench + test image + golden results for 2b-2e
 scripts/
   gen_vectors.py            golden model for the MAC, writes vectors.txt
@@ -102,9 +108,10 @@ flag stays aligned with its data.
    **Simulation**). Copy the data files (`image.hex` and `expected.txt`, or `vectors.txt` for 2a)
    into the project folder; they don't need to be added to the project.
 3. Simulation view → select the testbench → Simulate Behavioral Model → `run all`. Expect:
+   - 1: `PASS: 1879 cycles matched the golden model`
    - 2a: `PASS: 1879 vectors matched the golden model (latency 2)`
    - 2b–2e: `PASS: 5828 edge pixels matched the golden model`
-4. Implementation view → top = `mac_p` or `sobel` → Synthesize - XST.
+4. Implementation view → top = `mac`, `mac_p` or `sobel` → Synthesize - XST.
 
 ### Icarus Verilog (no Xilinx tools needed)
 
