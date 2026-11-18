@@ -1,4 +1,4 @@
-# FPGA Accelerator, Stage 2: from a MAC unit to a streaming Sobel edge detector
+# FPGA Accelerator: from a MAC unit to a systolic convolution engine
 
 Verilog for a small image-processing accelerator on a Xilinx Virtex-6 (ML605 board, XC6VLX240T),
 built and measured one step at a time. Each stage changes one thing, then checks it with a
@@ -71,6 +71,36 @@ Report excerpts with the critical paths are in [`results/synthesis/`](results/sy
   The catch: this version can only ever compute Sobel. A CNN layer needs changeable weights,
   which is why a general accelerator keeps the programmable engine.
 
+### Stage 3a: systolic convolution engine
+
+`conv3x3_sys` does the same job as `conv3x3` (programmable 3x3 kernel, one window per clock), but as
+a **systolic chain**: every tap stores its partial sum in its DSP's P register, and the next tap adds
+its product to that stored value on the next clock (`P_i <= P_(i-1) + x_i * w_i`). Because the
+partial sum reaches tap *i* exactly *i* clocks after tap 0, pixel *i* is delayed by *i* clocks too
+(the "skew" delay line in each tap), the same structure as a TPU-style systolic array.
+
+| | 2d (programmable) | 2e (fixed) | **3a (programmable, systolic)** |
+|---|---|---|---|
+| DSP48E1s | 18 | 0 | 18 |
+| Slice LUTs (incl. SRLs) | 255 | 227 | 239 (86 SRLs) |
+| Slice registers | 206 | 248 | 278 |
+| Slowest path | DSP→DSP hop (two adds) | BRAM read → write | magnitude add/clamp (fabric) |
+| Period | 3.70 ns | 2.74 ns | 3.05 ns |
+| **Est. clock** | **270 MHz** | **365 MHz** | **328 MHz** |
+| Latency (clocks) | 7 | 6 | 15 |
+| Simulation | PASS 5828 | PASS 5828 | PASS 5828 + unit test PASS 7500 |
+
+- Every DSP now runs with its multiplier and output registers on (XST: "registers also absorbed by
+  the MAC: `m_r`, `pout`"), and the slowest path is no longer anywhere in the DSP chain. The
+  programmable engine is within ~10% of the fixed Sobel's clock.
+- Gx and Gy delay the same pixels, so XST merged their skew delay lines: the whole skew costs
+  48 SRLs.
+- `tb_conv_sys` (no data files) runs 25 coefficient sets × 300 random windows, with a different
+  coefficient in every tap. Planted bugs were all caught; a wrong delay on the centre tap passes the
+  Sobel test (its coefficient is 0 in both kernels) but fails the unit test.
+- Coefficients must only change while the engine is idle (each tap samples its coefficient at a
+  different time). Stage 3b loads weights properly.
+
 ## Repository layout
 
 ```
@@ -81,9 +111,11 @@ rtl/
   2c_pipelined_adder/       sobel.v, conv3x3.v          adder tree split over two clocks
   2d_pipelined_magnitude/   sobel.v, conv3x3.v          magnitude split over two clocks
   2e_constant_kernel/       sobel.v, sobel_kernel.v     fixed Sobel, no multipliers
+  3a_systolic/              sobel.v, conv3x3_sys.v      programmable systolic 3x3 engine
 sim/
   tb_mac.v, tb_mac_p.v, vectors.txt                     testbenches + shared test vectors for 1 and 2a
-  tb_sobel.v, image.hex, expected.txt                   testbench + test image + golden results for 2b-2e
+  tb_sobel.v, image.hex, expected.txt                   testbench + test image + golden results for 2b-3a
+  tb_conv_sys.v                                         unit testbench for conv3x3_sys (no data files)
 scripts/
   gen_vectors.py            golden model for the MAC, writes vectors.txt
   gen_sobel.py              test image + golden Sobel model, writes image.hex / expected.txt
@@ -95,9 +127,9 @@ results/
   sim_out_2b.hex            raw output of the Stage 2b simulation
 ```
 
-The same `tb_sobel.v` tests all four Sobel stages. It follows `out_valid`, so it doesn't depend on
-the pipeline latency, and it randomly skips about 25% of input clocks to check that every valid
-flag stays aligned with its data.
+The same `tb_sobel.v` tests all five Sobel stages. It follows `out_valid`, so it doesn't depend on
+the pipeline latency (it waits 30 clocks at the end, enough for 3a's 15-clock pipeline), and it
+randomly skips about 25% of input clocks to check that every valid flag stays aligned with its data.
 
 ## Running it
 
@@ -110,16 +142,19 @@ flag stays aligned with its data.
 3. Simulation view → select the testbench → Simulate Behavioral Model → `run all`. Expect:
    - 1: `PASS: 1879 cycles matched the golden model`
    - 2a: `PASS: 1879 vectors matched the golden model (latency 2)`
-   - 2b–2e: `PASS: 5828 edge pixels matched the golden model`
+   - 2b–3a: `PASS: 5828 edge pixels matched the golden model`
+   - 3a unit test (`tb_conv_sys`): `PASS: 7500 windows matched the reference (latency 11)`
 4. Implementation view → top = `mac`, `mac_p` or `sobel` → Synthesize - XST.
 
 ### Icarus Verilog (no Xilinx tools needed)
 
-From the `sim/` folder, for example Stage 2e:
+From the `sim/` folder, for example Stage 3a:
 
 ```
-iverilog -o sobel_sim tb_sobel.v ../rtl/2e_constant_kernel/sobel.v ../rtl/2e_constant_kernel/sobel_kernel.v
+iverilog -o sobel_sim tb_sobel.v ../rtl/3a_systolic/sobel.v ../rtl/3a_systolic/conv3x3_sys.v
 vvp sobel_sim
+iverilog -o conv_sim tb_conv_sys.v ../rtl/3a_systolic/conv3x3_sys.v
+vvp conv_sim
 ```
 
 ### See the hardware's picture
@@ -142,5 +177,5 @@ python ../scripts/gen_vectors.py    # vectors.txt for the MAC testbench
 
 ## Next
 
-Stage 3: a small grid of programmable MAC units with weights in on-chip memory, built as a
-systolic chain so every DSP runs with its pipeline registers enabled.
+- **3b**: a conv-layer grid: several filters share one window, with weights loaded at runtime.
+- **3c**: CNN-style output stage: bias, ReLU and requantization back to 8 bits.

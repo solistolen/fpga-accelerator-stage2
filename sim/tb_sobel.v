@@ -1,4 +1,5 @@
-// Self-checking testbench for the Stage 2b Sobel engine.
+// Self-checking testbench for the Sobel engine (Stage 2b onward).
+// Stage 3a: drain time raised from 10 to 30 clocks for the longer pipeline.
 // Streams image.hex into the design one pixel at a time, with random idle
 // cycles (like a real camera link), and checks every result against
 // expected.txt from gen_sobel.py. Also writes what the hardware produced to
@@ -69,7 +70,7 @@ module tb_sobel;
             end
         end
         @(negedge clk) in_valid = 0;
-        repeat (10) @(posedge clk);                    // let the pipeline drain
+        repeat (30) @(posedge clk);                    // let the pipeline drain (Stage 3a: 15-clock latency)
 
         $fclose(fexp);
         $fclose(fout);

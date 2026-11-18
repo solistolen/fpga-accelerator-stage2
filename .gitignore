@@ -43,6 +43,7 @@ usage_statistics_webtalk.html
 # Icarus Verilog
 *.vvp
 sobel_sim
+conv_sim
 mac_sim
 *.vcd
 
