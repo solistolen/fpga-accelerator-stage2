@@ -1,0 +1,58 @@
+Stage 2c: Sobel, conv3x3 with a pipelined adder tree (row sums, then total; 3-clock pipeline)
+Xilinx ISE 14.7, XST P.20131013 (lin64), target xc6vlx240t-1-ff1156, top = sobel (IMG_W = 640)
+Excerpt of the XST synthesis report (sobel.syr). Estimates only, before place-and-route.
+Warnings: 3 (HDLCompiler:413 x2 counter wrap, Xst:2677 s1_row_0 trimmed). Errors: 0.
+
+=========================================================================
+Advanced HDL Synthesis Report
+
+Macro Statistics
+# RAMs                                                 : 1
+ 1024x16-bit dual-port block RAM                       : 1
+# MACs                                                 : 12
+ 9x8-to-18-bit MAC                                     : 6
+ 9x8-to-19-bit MAC                                     : 6
+# Multipliers                                          : 6
+ 9x8-bit registered multiplier                         : 6
+# Adders/Subtractors                                   : 7
+ 20-bit adder                                          : 4
+ 20-bit subtractor                                     : 2
+ 21-bit adder                                          : 1
+# Counters                                             : 2
+ 10-bit up counter                                     : 2
+# Registers                                            : 194
+ Flip-Flops                                            : 194
+# Comparators                                          : 3
+ 10-bit comparator lessequal                           : 2
+ 21-bit comparator greater                             : 1
+# Multiplexers                                         : 2
+ 20-bit 2-to-1 multiplexer                             : 2
+
+=========================================================================
+Device utilization summary:
+
+Slice Logic Utilization:
+ Number of Slice Registers:             165  out of  301440     0%
+ Number of Slice LUTs:                  206  out of  150720     0%
+    Number used as Logic:               206  out of  150720     0%
+
+Specific Feature Utilization:
+ Number of Block RAM/FIFO:                1  out of    416     0%
+    Number using Block RAM only:          1
+ Number of BUFG/BUFGCTRLs:                1  out of     32     3%
+ Number of DSP48E1s:                     18  out of    768     2%
+
+=========================================================================
+Timing Summary:
+Speed Grade: -1
+
+   Minimum period: 4.052ns (Maximum Frequency: 246.822MHz)
+   Minimum input arrival time before clock: 2.496ns
+   Maximum output required time after clock: 0.777ns
+
+Critical path (magnitude logic in sobel.v, 17 levels of logic):
+  Source:            cy/sum_0 (FF)
+  Destination:       out_mag_0 (FF)
+    negate |gy| (20-bit carry chain) -> add |gx|+|gy| (carry chain)
+    -> compare > 255 (LUT6) -> clamp (LUT6) -> out_mag
+    Total                      4.052ns (1.910ns logic, 2.142ns route)

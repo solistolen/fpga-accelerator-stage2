@@ -1,0 +1,22 @@
+Stage 2a: pipelined MAC (mac_p) vs the Stage 1 MAC (mac)
+Xilinx ISE 14.7, XST P.20131013 (lin64), target xc6vlx240t-1-ff1156, top = mac / mac_p
+Summary of the two XST synthesis reports (the full report text was not saved in this repo).
+Estimates only, before place-and-route.
+
+                          Stage 1 (mac)        Stage 2a (mac_p)
+DSP48E1s                  1                    1
+Slice LUTs                1 (INV)              1 (INV)
+Fabric flip-flops         0                    2 (en_r, clr_r)
+Input -> register         4.088 ns             2.433 ns
+Register -> register      no path found        3.181 ns
+Est. max clock            ~245 MHz             ~314 MHz
+Latency                   1 clock              2 clocks
+
+Stage 1: XST inferred an "8x8-to-32-bit Loadable MAC" in one DSP48E1. The only register is acc,
+which is the DSP's P register, so the slowest path is input pin -> multiplier -> adder -> acc.
+
+Stage 2a: "The following registers are also absorbed by the MAC: <prod_r>" - the product
+register became the DSP's internal multiplier register (MREG). The slowest path moved to the
+control signal: clr_r (FF) -> INV (LUT) -> DSP48E1 OPMODE input = 3.181 ns.
+
+Simulation: PASS: 1879 vectors matched the golden model (latency 2)

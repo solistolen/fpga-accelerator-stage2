@@ -1,0 +1,60 @@
+Stage 2e: Sobel with a fixed (constant) kernel: sobel_kernel.v, no multipliers (2-clock pipeline) + pipelined magnitude
+Xilinx ISE 14.7, XST P.20131013 (lin64), target xc6vlx240t-1-ff1156, top = sobel (IMG_W = 640)
+Excerpt of the XST synthesis report (sobel.syr). Estimates only, before place-and-route.
+Warnings: 20, all expected trimming: Xst:647 win<39:32> unused (centre pixel p4, coefficient 0),
+Xst:1710/1895 ax_r/ay_r bits 12-19 constant 0 (|gx|, |gy| never exceed 12 bits),
+HDLCompiler:413 x2 counter wrap, Xst:2677 s1_row_0 trimmed. Errors: 0.
+
+=========================================================================
+Advanced HDL Synthesis Report
+
+Macro Statistics
+# RAMs                                                 : 1
+ 1024x16-bit dual-port block RAM                       : 1
+# Adders/Subtractors                                   : 13
+ 10-bit subtractor                                     : 6
+ 12-bit adder                                          : 4
+ 20-bit subtractor                                     : 2
+ 21-bit adder                                          : 1
+# Counters                                             : 2
+ 10-bit up counter                                     : 2
+# Registers                                            : 334
+ Flip-Flops                                            : 334
+(no MACs, no multipliers)
+
+Final Register Report
+# Registers                                            : 218
+ Flip-Flops                                            : 218
+# Shift Registers                                      : 30
+ 2-bit shift register                                  : 30
+
+=========================================================================
+Device utilization summary:
+
+Slice Logic Utilization:
+ Number of Slice Registers:             248  out of  301440     0%
+ Number of Slice LUTs:                  227  out of  150720     0%
+    Number used as Logic:               197  out of  150720     0%
+    Number used as Memory:               30  out of  58400     0%
+       Number used as SRL:               30
+
+Specific Feature Utilization:
+ Number of Block RAM/FIFO:                1  out of    416     0%
+    Number using Block RAM only:          1
+ Number of BUFG/BUFGCTRLs:                1  out of     32     3%
+ (no DSP48E1 line: 0 DSPs used)
+
+=========================================================================
+Timing Summary:
+Speed Grade: -1
+
+   Minimum period: 2.739ns (Maximum Frequency: 365.097MHz)
+   Minimum input arrival time before clock: 1.840ns
+   Maximum output required time after clock: 0.830ns
+
+Critical path (line-buffer block RAM read feeding its own write port, 0 levels of logic):
+  Source:            Mram_lb (RAM)
+  Destination:       Mram_lb (RAM)
+     RAMB18E1:CLKARDCLK->DOBDO7    2.073   net 0.405  (lb_q<7>)
+     RAMB18E1:DIADI15 setup        0.261
+    Total                          2.739ns (2.334ns logic, 0.405ns route)
